@@ -1,0 +1,56 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: Node.js CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [14.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'yarn'
+    - name: Install packages
+      run: yarn install
+    - run: yarn run build
+    - run: yarn test
+
+    - name: Make envfile
+      uses: SpicyPizza/create-envfile@v1.3
+      with:
+        fail_on_empty: true
+        envkey_MONGO_URL: ${{ secrets.MONGO_URL }}
+        envkey_SESSION_NAME: ${{ secrets.SESSION_NAME }}
+        envkey_SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+        envkey_GOOGLE_CLIENTID: ${{ secrets.GOOGLE_CLIENTID }}
+        envkey_GOOGLE_CLIENTSECRET: ${{ secrets.GOOGLE_CLIENTSECRET }}
+        envkey_AWS_ACCESSKEYID: ${{ secrets.AWS_ACCESSKEYID }}
+        envkey_AWS_SECRETACCESSKEY: ${{ secrets.AWS_SECRETACCESSKEY }}
+        envkey_NEXT_PUBLIC_URL_APP: "http://njosten.acsg540.com"
+        envkey_GITHUB_LIVE_CLIENTID: ${{ secrets.GHUB_LIVE_CLIENTID }}
+        envkey_GITHUB_LIVE_SECRETKEY: ${{ secrets.GHUB_LIVE_SECRETKEY }}
+
+    - name: rsync deployments
+      uses: burnett01/rsync-deployments@5.1
+      with:
+        switches: -vzr --include=".env" --delete
+        path: ./
+        remote_path: /var/www/jbanahan/
+        remote_host: ec2-34-221-53-119.us-west-2.compute.amazonaws.com
+        remote_user: ubuntu
+        remote_key: "${{ secrets.SSH_PRIVATE_KEY }}"
